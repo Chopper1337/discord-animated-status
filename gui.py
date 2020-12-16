@@ -1633,8 +1633,10 @@ class App(QWidget):
         if not self.core.config['disable_rpc']:
             if self.core.rpc:
                 self.core.disconnect_rpc()
+
         self.to_close_app = True # ignore config check in closeEvent
-        self.close()
+        app = QApplication.instance()
+        app.closeAllWindows()
 
     def closeEvent(self, event):
         if self.to_close_app:
