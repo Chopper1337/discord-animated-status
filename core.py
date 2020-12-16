@@ -9,7 +9,8 @@ from datetime import datetime
 import requests
 import pypresence
 
-from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot, QTimer, Qt
+from PyQt5.QtCore import QThread, QObject, QTimer, Qt, pyqtSignal, pyqtSlot
+from PyQt5.QtWidgets import QMessageBox
 
 from constants import API_URL
 from variables_parser import VariablesParser
@@ -124,7 +125,7 @@ class Core(object):
         self.gui.frames_list_edit_filling()
         if self.config['randomize_frames']:
             self.gui.randomize_frames_checkbox.toggle()
-        if self.config['rpc_client_id'] and not self.config['disable_rpc']:
+        if not self.config['disable_rpc']:
             if (not self.rpc_thread.isFinished()) and (self.rpc):
                 if self.rpc.client_id != str(self.config['rpc_client_id']):
                     self.disconnect_rpc()
@@ -139,6 +140,38 @@ class Core(object):
         logging.info('Config applied.')
 
     def connect_rpc(self):
+        if self.config['rpc_client_id']:
+            if not self.config['rpc_client_id'].strip().isdigit():
+                if self.gui.isHidden():
+                    self.gui.maximize_window()
+                logging.error("Application RPC Client ID is not a digit.")
+                self.config['disable_rpc'] = True
+                logging.info('Config parameter "disable_rpc" has been set to true.')
+                self.config_save()
+                error_window = QMessageBox()
+                error_window.setWindowTitle(self.gui.lang_manager.get_string("error"))
+                error_window.setWindowIcon(self.gui.icon)
+                error_window.setText(self.gui.lang_manager.get_string("client_id_is_not_a_digit"))
+                error_window.setIcon(QMessageBox.Warning)
+                error_window.exec_()
+                error_window.deleteLater()
+                return False
+        else:
+            if self.gui.isHidden():
+                self.gui.maximize_window()
+            logging.error("Application RPC Client ID is empty.")
+            self.config['disable_rpc'] = True
+            logging.info('Config parameter "disable_rpc" has been set to true.')
+            self.config_save()
+            error_window = QMessageBox()
+            error_window.setWindowTitle(self.gui.lang_manager.get_string("error"))
+            error_window.setWindowIcon(self.gui.icon)
+            error_window.setText(self.gui.lang_manager.get_string("enter_the_client_id"))
+            error_window.setIcon(QMessageBox.Warning)
+            error_window.exec_()
+            error_window.deleteLater()
+            return False
+
         self.rpc = RichPresenceCustom(self.config['rpc_client_id'], self.string_constants, self.config['rpc_reconnect_delay'])
         self.rpc_thread.start()
         self.rpc.moveToThread(self.rpc_thread)
@@ -146,6 +179,10 @@ class Core(object):
         self.rpc.start_connect.connect(self.rpc.run)
         self.rpc.start_connect.emit()
         self.clock.start()
+
+        self.gui.switch_rpc_tray_action.setText(self.gui.lang_manager.get_string("disable_rpc"))
+
+        return True
 
     def disconnect_rpc(self):
         try:
@@ -162,6 +199,24 @@ class Core(object):
         self.rpc_thread.quit()
         self.rpc.deleteLater()
         self.rpc.reconnect_timer.deleteLater()
+
+        self.gui.switch_rpc_tray_action.setText(self.gui.lang_manager.get_string("enable_rpc"))
+
+        logging.info('Discord RPC disabled.')
+
+    def switch_rpc_connection(self):
+        new_bool = not self.config['disable_rpc']
+
+        if not new_bool:
+            result = self.connect_rpc()
+            if not result:
+                return
+        else:
+            if self.rpc:
+                self.disconnect_rpc()
+
+        self.config['disable_rpc'] = new_bool
+        self.config_save()
 
     def on_clock_tick(self):
         if self.rpc.error:

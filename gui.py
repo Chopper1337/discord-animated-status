@@ -176,11 +176,12 @@ class App(QWidget):
         self.tray_icon.setIcon(self.icon)
         self.tray_icon.setToolTip("Discord Animated Status")
 
-        menu = QMenu()
-        self.run_stop_animated_status = menu.addAction(self.lang_manager.get_string("launch"))
-        self.exit_the_program = menu.addAction(self.lang_manager.get_string("quit"))
+        tray_icon_menu = QMenu()
+        self.run_stop_animated_status = tray_icon_menu.addAction(self.lang_manager.get_string("launch"))
+        self.switch_rpc_tray_action = tray_icon_menu.addAction(self.lang_manager.get_string("enable_rpc"))
+        self.exit_the_program = tray_icon_menu.addAction(self.lang_manager.get_string("quit"))
 
-        self.tray_icon.setContextMenu(menu)
+        self.tray_icon.setContextMenu(tray_icon_menu)
         self.tray_icon.show()
 
         # + END TRAY SECTION
@@ -360,6 +361,7 @@ class App(QWidget):
         self.tray_icon.messageClicked.connect(self.maximize_window)
 
         self.run_stop_animated_status.triggered.connect(self.run_animation)
+        self.switch_rpc_tray_action.triggered.connect(self.core.switch_rpc_connection)
         self.exit_the_program.triggered.connect(self.close_app)
 
         self.frameUpdated.connect(self.update_frame_screen)
@@ -1252,20 +1254,28 @@ class App(QWidget):
         disable_btn.setFont(QFont(self.btnFontFamily, 10))
 
         def on_clock_tick():
-            if self.core.rpc.is_connected:
-                clock.stop()
-                rpc_status_lbl.setText(self.lang_manager.get_string('rpc_status_connected'))
+            if not self.core.config['disable_rpc']:
+                disable_btn.setText(self.lang_manager.get_string('disable'))
+                if self.core.rpc:
+                    if self.core.rpc.is_connected:
+                        status_string = self.lang_manager.get_string('rpc_status_connected')
+                else:
+                    return rpc_status_lbl.setText('')
+            else:
+                disable_btn.setText(self.lang_manager.get_string('enable'))
+                rpc_status_lbl.setText(self.lang_manager.get_string('rpc_status_disabled'))
                 return
 
-            self._rpc_wait_ticks_buffer += 1
-            if self._rpc_wait_ticks_buffer >= 4:
-                self._rpc_wait_ticks_buffer = 1
+            if not self.core.rpc.is_connected:
+                self._rpc_wait_ticks_buffer += 1
+                if self._rpc_wait_ticks_buffer >= 4:
+                    self._rpc_wait_ticks_buffer = 1
 
-            status_string = self.lang_manager.get_string('rpc_status_connecting') \
-                                                         % ('.' * self._rpc_wait_ticks_buffer)
+                status_string = self.lang_manager.get_string('rpc_status_connecting') \
+                                % ('.' * self._rpc_wait_ticks_buffer)
+
             if self.core.rpc.error:
                 if self.core.rpc.error.is_critical:
-                    clock.stop()
                     status_string = self.lang_manager.get_string('rpc_status_failed') \
                                     % self.lang_manager.get_string(self.core.rpc.error.lang_string)
                 else:
@@ -1353,6 +1363,7 @@ class App(QWidget):
                 if self.core.rpc:
                     self.core.disconnect_rpc()
                 self.core.connect_rpc()
+                self._rpc_wait_ticks_buffer = 0
 
             if self.core.rpc.is_connected:
                 try:
@@ -1367,10 +1378,6 @@ class App(QWidget):
                     error_window.setIcon(QMessageBox.Warning)
                     error_window.exec_()
                     error_window.deleteLater()
-            else:
-                if not clock.isActive():
-                    self._rpc_wait_ticks_buffer = 0
-                    clock.start()
 
         def switch_connection():
             new_bool = not self.core.config['disable_rpc']
@@ -1379,9 +1386,7 @@ class App(QWidget):
             if new_bool:
                 if self.core.rpc:
                     self.core.disconnect_rpc()
-                logging.info('Discord RPC disabled.')
                 rpc_status_lbl.setText(self.lang_manager.get_string('rpc_status_disabled'))
-                clock.stop()
                 disable_btn.setText(self.lang_manager.get_string('enable'))
 
             else:
@@ -1411,10 +1416,10 @@ class App(QWidget):
                 self.core.config['rpc_client_id'] = client_id
 
                 self.core.connect_rpc()
-                logging.info('Discord RPC enabled.')
                 disable_btn.setText(self.lang_manager.get_string('disable'))
+                logging.info('Discord RPC enabled.')
+
                 self._rpc_wait_ticks_buffer = 0
-                clock.start()
 
             self.core.config['disable_rpc'] = new_bool
             self.core.config_save()
@@ -1429,21 +1434,11 @@ class App(QWidget):
         small_image_text_edit.setText(str(self.core.config['default_rpc']['small_image_text']))
         client_id_edit.setText(str(self.core.config['rpc_client_id']))
 
-        if not self.core.config['disable_rpc'] and self.core.config['rpc_client_id']:
-            disable_btn.setText(self.lang_manager.get_string('disable'))
-            if self.core.rpc:
-                if self.core.rpc.is_connected:
-                    rpc_status_lbl.setText(self.lang_manager.get_string('rpc_status_connected'))
-                else:
-                    clock.start()
-        else:
-            disable_btn.setText(self.lang_manager.get_string('enable'))
-            rpc_status_lbl.setText(self.lang_manager.get_string('rpc_status_disabled'))
-
         continue_btn.clicked.connect(save_and_close)
         update_btn.clicked.connect(update_rpc)
         disable_btn.clicked.connect(switch_connection)
 
+        clock.start()
         rpc_edit_window.setFocus()
         rpc_edit_window.exec_()
         clock.stop()
@@ -1635,7 +1630,7 @@ class App(QWidget):
 
     def close_app(self):
         self.tray_icon.hide()
-        if self.core.config['rpc_client_id'] and not self.core.config['disable_rpc']:
+        if not self.core.config['disable_rpc']:
             if self.core.rpc:
                 self.core.disconnect_rpc()
         self.to_close_app = True # ignore config check in closeEvent
