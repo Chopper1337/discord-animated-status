@@ -1637,6 +1637,7 @@ class App(QWidget):
         self.to_close_app = True # ignore config check in closeEvent
         app = QApplication.instance()
         app.closeAllWindows()
+        self.close()
 
     def closeEvent(self, event):
         if self.to_close_app:
