@@ -1,4 +1,4 @@
-![Python 3.8](https://img.shields.io/badge/python-3.8-brightgreen) ![Gui PyQt5](https://img.shields.io/badge/gui-pyqt5-blue) ![Stable-Version](https://img.shields.io/badge/stable--version-2.1.0-green)
+![Python 3.8](https://img.shields.io/badge/python-3.8-brightgreen) ![Gui PyQt5](https://img.shields.io/badge/gui-pyqt5-blue) ![Stable-Version](https://img.shields.io/badge/stable--version-2.1.1-green)
 
 # Information
 External libraries used:
