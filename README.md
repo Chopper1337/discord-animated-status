@@ -1,5 +1,8 @@
 ![Python 3.8](https://img.shields.io/badge/python-3.8-brightgreen) ![Gui PyQt5](https://img.shields.io/badge/gui-pyqt5-blue) ![Stable-Version](https://img.shields.io/badge/stable--version-2.1.1-green)
 
+# First of all,
+yes, this is a selfbot.
+
 # Information
 External libraries used:
 * PyQt5
